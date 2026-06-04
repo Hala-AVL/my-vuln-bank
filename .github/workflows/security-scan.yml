@@ -1,0 +1,59 @@
+name: "SecOps Advanced Security Pipeline"
+
+# 1. تحديد متى يشتغل الـ Pipeline تلقائياً
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  schedule:
+    - cron: '0 0 * * 0' # فحص دوري تلقائي كل يوم أحد للتأكد من الثغرات الجديدة
+
+jobs:
+  # ==========================================
+  # المرحلة الأولى: فحص المكتبات والاعتماديات باستخدام Trivy
+  # ==========================================
+  trivy-dependency-scan:
+    name: "Trivy Dependency & Image Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs' # فحص ملفات المشروع (مثل requirements.txt)
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH' # التركيز على الثغرات الخطيرة والعالية فقط
+          exit-code: '0' # نضعها 0 حتى لا يتوقف الـ Pipeline لو وجد ثغرات بالمكتبات ويسمح بـ CodeQL بالعمل
+
+  # ==========================================
+  # المرحلة الثانية: الفحص الساكن للكود باستخدام CodeQL
+  # ==========================================
+  codeql-sast-scan:
+    name: "CodeQL Deep SAST Scan"
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write # صلاحية ضرورية جداً لتسمح للـ Pipeline بكتابة ورفع الثغرات لتبويب الـ Security
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      # تجهيز بيئة الـ CodeQL الافتراضية
+      - name: Initialize CodeQL Toolchain
+        uses: github/codeql-action/init@v3
+        with:
+          languages: 'python' # تحديد لغة برمجة تطبيق البنك
+          queries: security-and-quality # اختيار حزمة الفحص المتقدمة (الأمان والجودة)
+
+      # بما أن بايثون لغة تفسيرية، الـ Setup والـ Build يتم تلقائياً بدون أوامر معقدة
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+          # هذا الخيار يقوم بتوليد ملف الـ SARIF تلقائياً خلف الكواليس ورفعه مباشرة لـ GitHub Security Tab
