@@ -1,9 +1,12 @@
+let merchantApiKeyMemory = null;
+
 function merchantStoreCredentials(data) {
     if (data.token) {
         localStorage.setItem('merchant_jwt_token', data.token);
     }
     if (data.api_key) {
-        localStorage.setItem('merchant_api_key', data.api_key);
+        merchantApiKeyMemory = data.api_key;
+        localStorage.removeItem('merchant_api_key');
     }
     if (data.merchant) {
         localStorage.setItem('merchant_profile', JSON.stringify(data.merchant));
@@ -20,7 +23,7 @@ function merchantGetProfile() {
 
 function merchantAuthHeaders() {
     const headers = { 'Content-Type': 'application/json' };
-    const apiKey = localStorage.getItem('merchant_api_key');
+    const apiKey = merchantApiKeyMemory;
     const token = localStorage.getItem('merchant_jwt_token');
 
     if (apiKey) {
